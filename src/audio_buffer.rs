@@ -33,10 +33,21 @@ impl AudioBuffer {
 	}
 
 	/// Create a new buffer from a list of channel data.
-	pub fn from_channels(channels_data:Vec<Vec<f32>>, sample_rate:u32) -> AudioBuffer {
+	pub fn from_channels(mut channels_data:Vec<Vec<f32>>, sample_rate:u32) -> AudioBuffer {
+		if channels_data.is_empty() {
+			return AudioBuffer::from_samples(Vec::new(), 0, sample_rate);
+		}
+
+		// Fill shortest channels data with 0.
+		let max_size:usize = channels_data.iter().map(|channel| channel.len()).max().unwrap();
+		for channel in &mut channels_data {
+			channel.extend(vec![0.0; max_size - channel.len()]);
+		}
+
+		// Return new buffer.
 		let channel_count:usize = channels_data.len();
 		AudioBuffer::from_samples(
-			channels_data.into_iter().flatten().collect(),
+			(0..channels_data[0].len()).map(|sample_index| channels_data.iter().map(|channel| channel[sample_index]).collect::<Vec<f32>>()).flatten().collect(),
 			channel_count,
 			sample_rate
 		)
@@ -167,7 +178,7 @@ impl AudioBuffer {
 				let mut channel_index:usize = 0;
 				for sample in self.data.clone() {
 					channels_data[channel_index].push(sample);
-					channel_index = channel_index;
+					channel_index += 1;
 					if channel_index == channel_count {
 						channel_index = 0;
 					}
