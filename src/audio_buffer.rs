@@ -131,21 +131,22 @@ impl AudioBuffer {
 
 		// Calculate how much to increment the source index per each incrementation of the target index.
 		let source_sample_count:f32 = self.data.len() as f32;
-		let target_sample_count:f32 = source_sample_count * factor.floor();
+		let target_sample_count:f32 = (source_sample_count * factor).floor();
 		let source_index_increment:f32 = 1.0 / factor;
+		let source_index_max:usize = source_sample_count as usize - 1;
 
 		// For each new sample, calculate a new sample based on the progress between samples in the source.
 		let mut new_data:Vec<f32> = Vec::with_capacity(target_sample_count as usize);
 		let mut source_index:f32 = 0.0;
 		while source_index < source_sample_count {
 			let source_index_left:usize = source_index.floor() as usize;
-			let source_index_right:usize = source_index_left + 1;
+			let source_index_right:usize = (source_index_left + 1).min(source_index_max);
 			let source_index_fact:f32 = source_index % 1.0;
-			new_data.push((self.data[source_index_left] * source_index_fact + self.data[source_index_right] * (1.0 - source_index_fact)) * 0.5);
+			new_data.push(self.data[source_index_left] + (self.data[source_index_right] - self.data[source_index_left]) * source_index_fact);
 			
 			source_index += source_index_increment;
 		}
-		self.data = new_data
+		self.data = new_data;
 	}
 
 
@@ -198,5 +199,11 @@ impl AudioBuffer {
 	pub fn processed_channels_data(&mut self) -> Vec<Vec<f32>> {
 		self.apply_effects();
 		self.raw_channels_data()
+	}
+
+	#[cfg(test)]
+	/// Get the amount of modifications scheduled.
+	pub(super) fn mod_count(&self) -> usize {
+		self.modifications.len()
 	}
 }
