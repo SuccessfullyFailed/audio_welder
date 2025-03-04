@@ -2,12 +2,14 @@ use std::error::Error;
 
 
 
+#[derive(Clone, PartialEq)]
 pub struct AudioMod { factor:f32, mod_type:AudioModType }
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum AudioModType { Volume, Duration }
 
 
 
+#[derive(Clone, PartialEq)]
 pub struct AudioBuffer {
 	data:Vec<f32>,
 	channel_count:usize,
@@ -65,18 +67,19 @@ impl AudioBuffer {
 
 	/// Add a volume multiplication to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
 	pub fn multiply_volume(&mut self, multiplication:f32) {
-		self.modifications.push(AudioMod { factor: multiplication, mod_type: AudioModType::Volume });
-		self.combine_scheduled_modifications();
+		self.add_effect(multiplication, AudioModType::Volume);
 	}
 
 	/// Add a speed multiplication to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
 	pub fn multiply_duration(&mut self, multiplication:f32) {
-		self.modifications.push(AudioMod { factor: multiplication, mod_type: AudioModType::Duration });
-		self.combine_scheduled_modifications();
+		self.add_effect(multiplication, AudioModType::Duration);
 	}
 
-	/// Combine scheduled effects where possible.
-	fn combine_scheduled_modifications(&mut self) {
+	/// Add a new effect to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
+	fn add_effect(&mut self, factor:f32, mod_type:AudioModType) {
+		self.modifications.push(AudioMod { factor, mod_type });
+
+		// Combine scheduled effects where possible.
 		for right_index in (1..self.modifications.len()).rev() {
 			let left_index:usize = right_index - 1;
 			if self.modifications[left_index].mod_type == self.modifications[right_index].mod_type {
@@ -92,7 +95,7 @@ impl AudioBuffer {
 
 	/// Apply all current scheduled effects.
 	pub fn apply_effects(&mut self) {
-		while (!self.modifications.is_empty()) {
+		while !self.modifications.is_empty() {
 			let effect:AudioMod = self.modifications.remove(0);
 			match effect.mod_type {
 				AudioModType::Volume => self.apply_volume_modification(effect.factor),
@@ -132,5 +135,57 @@ impl AudioBuffer {
 			source_index += source_index_increment;
 		}
 		self.data = new_data
+	}
+
+
+
+	/* PROPERTY GETTER METHODS */
+
+	/// Get the channel-count.
+	pub fn channel_count(&self) -> usize {
+		self.channel_count
+	}
+
+	/// Get the sample-rate in samples per second.
+	pub fn sample_rate(&self) -> u32 {
+		self.sample_rate
+	}
+
+	/// Get the unprocessed data flat.
+	pub fn raw_data(&self) -> &Vec<f32> {
+		&self.data
+	}
+
+	/// Get the unprocessed data in separate lists per channel.
+	pub fn raw_channels_data(&self) -> Vec<Vec<f32>> {
+		match self.channel_count {
+			0 => Vec::new(),
+			1 => vec![self.data.clone()],
+			channel_count => {
+				let channel_sample_count:usize = self.data.len() / channel_count + 1;
+				let mut channels_data:Vec<Vec<f32>> = vec![Vec::with_capacity(channel_sample_count); channel_count];
+				let mut channel_index:usize = 0;
+				for sample in self.data.clone() {
+					channels_data[channel_index].push(sample);
+					channel_index = channel_index;
+					if channel_index == channel_count {
+						channel_index = 0;
+					}
+				}
+				channels_data
+			}
+		}
+	}
+
+	/// Get the processed data flat.
+	pub fn processed_data(&mut self) -> &Vec<f32> {
+		self.apply_effects();
+		self.raw_data()
+	}
+
+	/// Get the processed data flat.
+	pub fn processed_channels_data(&mut self) -> Vec<Vec<f32>> {
+		self.apply_effects();
+		self.raw_channels_data()
 	}
 }
