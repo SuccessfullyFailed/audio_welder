@@ -5,7 +5,7 @@ use std::error::Error;
 #[derive(Clone, PartialEq)]
 pub struct AudioMod { factor:f32, mod_type:AudioModType }
 #[derive(Clone, PartialEq)]
-pub enum AudioModType { Volume, Duration }
+pub enum AudioModType { Volume, Duration, SampleRate, ChannelCount }
 
 
 
@@ -86,6 +86,16 @@ impl AudioBuffer {
 		self.add_effect(multiplication, AudioModType::Duration);
 	}
 
+	/// Add a sample-rate modification. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
+	pub fn resample_sample_rate(&mut self, sample_rate:u32) {
+		self.add_effect(sample_rate as f32, AudioModType::SampleRate);
+	}
+
+	/// Add a channel modification. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
+	pub fn resample_channel_count(&mut self, channel_count:usize) {
+		self.add_effect(channel_count as f32, AudioModType::ChannelCount);
+	}
+
 	/// Add a new effect to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
 	fn add_effect(&mut self, factor:f32, mod_type:AudioModType) {
 		self.modifications.push(AudioMod { factor, mod_type });
@@ -110,7 +120,9 @@ impl AudioBuffer {
 			let effect:AudioMod = self.modifications.remove(0);
 			match effect.mod_type {
 				AudioModType::Volume => self.apply_volume_modification(effect.factor),
-				AudioModType::Duration => self.apply_speed_modification(effect.factor),
+				AudioModType::Duration => self.apply_duration_modification(effect.factor),
+				AudioModType::SampleRate => self.apply_sample_rate_modification(effect.factor as u32),
+				AudioModType::ChannelCount => self.apply_channel_count_modification(effect.factor as usize),
 			}
 		}
 	}
@@ -121,7 +133,7 @@ impl AudioBuffer {
 	}
 
 	/// Apply a speed modification to the data of the buffer.
-	fn apply_speed_modification(&mut self, mut factor:f32) {
+	fn apply_duration_modification(&mut self, mut factor:f32) {
 
 		// Reverse data if factor is less than 0.
 		if factor < 0.0 {
@@ -147,6 +159,42 @@ impl AudioBuffer {
 			source_index += source_index_increment;
 		}
 		self.data = new_data;
+	}
+
+	/// Modify the sample rate of the buffer..
+	fn apply_sample_rate_modification(&mut self, sample_rate:u32) {
+		self.apply_duration_modification(1.0 / self.sample_rate as f32 * sample_rate as f32);
+		self.sample_rate = sample_rate;
+	}
+
+	/// Modify the channel count of the buffer.
+	fn apply_channel_count_modification(&mut self, channel_count:usize) {
+
+		// Zero size.
+		if channel_count == 0 || self.channel_count == 0 {
+			self.data = Vec::new();
+		}
+		
+		// Size down
+		else if channel_count < self.channel_count {
+			self.data = self.data.chunks(self.channel_count).map(|chunk| &chunk[..channel_count]).flatten().cloned().collect();
+		}
+		
+		// Size up.
+		else {
+			let mut new_data:Vec<f32> = Vec::with_capacity(self.data.len() / self.channel_count * channel_count);
+			let mut cursor:usize = 0;
+			while cursor < self.data.len() {
+				new_data.extend_from_slice(&self.data[cursor..cursor + self.channel_count]);
+				for addition_index in 0..channel_count - self.channel_count {
+					new_data.push(self.data[cursor + (addition_index % self.channel_count)]);
+				}
+				cursor += self.channel_count;
+			}
+			self.data = new_data;
+		}
+
+		self.channel_count = channel_count;
 	}
 
 

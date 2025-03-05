@@ -99,4 +99,30 @@ mod tests {
 			assert!((*left - *right) < 0.01);
 		}
 	}
+
+	#[test]
+	fn test_effect_sample_rate() {
+		let saw_shape:Vec<f32> = (0..10).map(|index| index as f32 / 10.0).collect();
+		
+		let mut sample_rate_mod_buffer:AudioBuffer = AudioBuffer::from_samples(saw_shape.clone(), 1, 10);
+		sample_rate_mod_buffer.resample_sample_rate(5);
+		assert_eq!(sample_rate_mod_buffer.processed_data(), &(0..5).map(|index| saw_shape[index * 2]).collect::<Vec<f32>>());
+		assert_eq!(sample_rate_mod_buffer.sample_rate(), 5);
+	}
+
+	#[test]
+	fn test_effect_channel_count() {
+		let saw_shape:Vec<f32> = (0..10).map(|index| index as f32 / 10.0).collect();
+		let saw_shape_stereo:Vec<f32> = saw_shape.iter().zip(&saw_shape).map(|(left, right)| vec![left, right]).flatten().map(|value| value.to_owned()).collect::<Vec<f32>>();
+		
+		let mut channel_count_up_mod_buffer:AudioBuffer = AudioBuffer::from_samples(saw_shape.clone(), 1, 10);
+		channel_count_up_mod_buffer.resample_channel_count(2);
+		assert_eq!(channel_count_up_mod_buffer.processed_data(), &saw_shape_stereo);
+		assert_eq!(channel_count_up_mod_buffer.channel_count(), 2);
+		
+		let mut channel_count_down_mod_buffer:AudioBuffer = AudioBuffer::from_samples(saw_shape_stereo, 2, 10);
+		channel_count_down_mod_buffer.resample_channel_count(1);
+		assert_eq!(channel_count_down_mod_buffer.processed_data(), &saw_shape);
+		assert_eq!(channel_count_down_mod_buffer.channel_count(), 1);
+	}
 }
