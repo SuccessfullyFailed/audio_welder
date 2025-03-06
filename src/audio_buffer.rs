@@ -1,11 +1,5 @@
+use crate::{AudioEffect, DurationModifier, StereoShaper, VolumeAmplifier};
 use std::{ error::Error, time::Duration };
-
-
-
-#[derive(Clone, PartialEq)]
-pub struct AudioMod { factor:f32, mod_type:AudioModType }
-#[derive(Clone, PartialEq)]
-pub enum AudioModType { Volume, Duration, SampleRate, ChannelCount }
 
 
 
@@ -15,7 +9,7 @@ pub struct AudioBuffer {
 	channel_count:usize,
 	sample_rate:u32,
 
-	modifications:Vec<AudioMod>
+	effects:Vec<Box<dyn AudioEffect>>
 }
 impl AudioBuffer {
 
@@ -28,7 +22,7 @@ impl AudioBuffer {
 			channel_count,
 			sample_rate,
 
-			modifications: Vec::new()
+			effects: Vec::new()
 		}
 	}
 
@@ -74,141 +68,53 @@ impl AudioBuffer {
 
 
 
-	/* EFFECT SCHEDULING */
-
-	/// Add a volume multiplication to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
-	pub fn multiply_volume(&mut self, multiplication:f32) {
-		self.add_effect(multiplication, AudioModType::Volume);
-	}
-
-	/// Add a speed multiplication to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
-	pub fn multiply_duration(&mut self, multiplication:f32) {
-		self.add_effect(multiplication, AudioModType::Duration);
-	}
+	/* EFFECT METHODS */
 
 	/// Add a sample-rate modification. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
 	pub fn resample_sample_rate(&mut self, sample_rate:u32) {
-		self.add_effect(sample_rate as f32, AudioModType::SampleRate);
+		self.add_effect(DurationModifier::new_sample_rate_modifier(sample_rate));
 	}
 
 	/// Add a channel modification. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
 	pub fn resample_channel_count(&mut self, channel_count:usize) {
-		self.add_effect(channel_count as f32, AudioModType::ChannelCount);
+		self.add_effect(StereoShaper::new_channel_count_modifier(channel_count));
+	}
+
+	/// Add a volume multiplication to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
+	pub fn multiply_volume(&mut self, multiplication:f32) {
+		self.add_effect(VolumeAmplifier::new(multiplication));
+	}
+
+	/// Add a speed multiplication to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
+	pub fn multiply_duration(&mut self, multiplication:f32) {
+		self.add_effect(DurationModifier::new(multiplication));
+	}
+
+	/// Add stereo flip effect. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
+	pub fn flip_stereo(&mut self, factor:f32) {
+		self.add_effect(StereoShaper::new(1.0 - factor, 1.0 - factor, factor, factor));
 	}
 
 	/// Add a new effect to the sample. Does not apply it yet. The effect will be applied using the apply_effects method or when the audio is used.
-	fn add_effect(&mut self, factor:f32, mod_type:AudioModType) {
-		self.modifications.push(AudioMod { factor, mod_type });
+	pub fn add_effect<T>(&mut self, effect:T) where T:AudioEffect {
+		self.effects.push(effect.boxed());
 
 		// Combine scheduled effects where possible.
-		for right_index in (1..self.modifications.len()).rev() {
+		for right_index in (1..self.effects.len()).rev() {
 			let left_index:usize = right_index - 1;
-			if self.modifications[left_index].mod_type == self.modifications[right_index].mod_type {
-				self.modifications[left_index].factor *= self.modifications[right_index].factor;
-				self.modifications.remove(right_index);
+			if let Some(combined) = self.effects[left_index].combine(&*self.effects[right_index]) {
+				self.effects[left_index] = combined;
+				self.effects.remove(right_index);
 			}
 		}
 	}
-
-
-
-	/* EFFECT APPLICATION */
 
 	/// Apply all current scheduled effects.
 	pub fn apply_effects(&mut self) {
-		while !self.modifications.is_empty() {
-			let effect:AudioMod = self.modifications.remove(0);
-			match effect.mod_type {
-				AudioModType::Volume => self.apply_volume_modification(effect.factor),
-				AudioModType::Duration => self.apply_duration_modification(effect.factor),
-				AudioModType::SampleRate => self.apply_sample_rate_modification(effect.factor as u32),
-				AudioModType::ChannelCount => self.apply_channel_count_modification(effect.factor as usize),
-			}
+		while !self.effects.is_empty() {
+			let mut effect:Box<dyn AudioEffect> = self.effects.remove(0);
+			effect.apply_to(&mut self.data, &mut self.sample_rate, &mut self.channel_count);
 		}
-	}
-
-	/// Apply a volume modification to the data of the buffer.
-	fn apply_volume_modification(&mut self, factor:f32) {
-		if factor != 0.0 {
-			self.data.iter_mut().for_each(|sample| *sample *= factor);
-		}
-	}
-
-	/// Apply a speed modification to the data of the buffer.
-	fn apply_duration_modification(&mut self, mut factor:f32) {
-
-		// Reverse data if factor is less than 0.
-		if factor < 0.0 {
-			self.data.reverse();
-			factor = factor.abs();
-		}
-
-		// Return if no change needed.
-		if factor == 1.0 {
-			return;
-		}
-
-		// Calculate how much to increment the source index per each incrementation of the target index.
-		let source_sample_count:f32 = self.data.len() as f32;
-		let target_sample_count:f32 = (source_sample_count * factor).floor();
-		let source_index_increment:f32 = 1.0 / factor;
-		let source_index_max:usize = source_sample_count as usize - 1;
-
-		// For each new sample, calculate a new sample based on the progress between samples in the source.
-		let mut new_data:Vec<f32> = Vec::with_capacity(target_sample_count as usize);
-		let mut source_index:f32 = 0.0;
-		while source_index < source_sample_count {
-			let source_index_left:usize = source_index.floor() as usize;
-			let source_index_right:usize = (source_index_left + 1).min(source_index_max);
-			let source_index_fact:f32 = source_index % 1.0;
-			new_data.push(self.data[source_index_left] + (self.data[source_index_right] - self.data[source_index_left]) * source_index_fact);
-			
-			source_index += source_index_increment;
-		}
-		self.data = new_data;
-	}
-
-	/// Modify the sample rate of the buffer..
-	fn apply_sample_rate_modification(&mut self, sample_rate:u32) {
-		if self.sample_rate != sample_rate {
-			self.apply_duration_modification(1.0 / self.sample_rate as f32 * sample_rate as f32);
-			self.sample_rate = sample_rate;
-		}
-	}
-
-	/// Modify the channel count of the buffer.
-	fn apply_channel_count_modification(&mut self, channel_count:usize) {
-
-		// Size same.
-		if channel_count == self.channel_count {
-		}
-
-		// Zero size.
-		else if channel_count == 0 || self.channel_count == 0 {
-			self.data = Vec::new();
-		}
-
-		// Size down
-		else if channel_count < self.channel_count {
-			self.data = self.data.chunks(self.channel_count).map(|chunk| &chunk[..channel_count]).flatten().cloned().collect();
-		}
-		
-		// Size up.
-		else {
-			let mut new_data:Vec<f32> = Vec::with_capacity(self.data.len() / self.channel_count * channel_count);
-			let mut cursor:usize = 0;
-			let cursor_end:usize = self.data.len() - (self.channel_count - 1);
-			while cursor < cursor_end {
-				new_data.extend_from_slice(&self.data[cursor..cursor + self.channel_count]);
-				for addition_index in 0..channel_count - self.channel_count {
-					new_data.push(self.data[cursor + (addition_index % self.channel_count)]);
-				}
-				cursor += self.channel_count;
-			}
-			self.data = new_data;
-		}
-
-		self.channel_count = channel_count;
 	}
 
 
@@ -277,7 +183,7 @@ impl AudioBuffer {
 	#[cfg(test)]
 	/// Get the amount of modifications scheduled.
 	pub(super) fn mod_count(&self) -> usize {
-		self.modifications.len()
+		self.effects.len()
 	}
 }
 
