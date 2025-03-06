@@ -108,6 +108,16 @@ mod tests {
 		sample_rate_mod_buffer.resample_sample_rate(5);
 		assert_eq!(sample_rate_mod_buffer.processed_data(), &(0..5).map(|index| saw_shape[index * 2]).collect::<Vec<f32>>());
 		assert_eq!(sample_rate_mod_buffer.sample_rate(), 5);
+
+		let test_sample_rates:Vec<u32> = (0..20).map(|index| 1 << index).collect();
+		for in_sample_rate in &test_sample_rates {
+			for out_sample_rate in &test_sample_rates {
+				println!("{in_sample_rate} => {out_sample_rate}");
+				let mut sample_rate_mod_buffer:AudioBuffer = AudioBuffer::from_samples(saw_shape.clone(), 2, *in_sample_rate);
+				sample_rate_mod_buffer.resample_sample_rate(*out_sample_rate);
+				sample_rate_mod_buffer.apply_effects();
+			}
+		}
 	}
 
 	#[test]

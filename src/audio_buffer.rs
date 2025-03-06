@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{ error::Error, time::Duration };
 
 
 
@@ -129,7 +129,9 @@ impl AudioBuffer {
 
 	/// Apply a volume modification to the data of the buffer.
 	fn apply_volume_modification(&mut self, factor:f32) {
-		self.data.iter_mut().for_each(|sample| *sample *= factor);
+		if factor != 0.0 {
+			self.data.iter_mut().for_each(|sample| *sample *= factor);
+		}
 	}
 
 	/// Apply a speed modification to the data of the buffer.
@@ -139,6 +141,11 @@ impl AudioBuffer {
 		if factor < 0.0 {
 			self.data.reverse();
 			factor = factor.abs();
+		}
+
+		// Return if no change needed.
+		if factor == 1.0 {
+			return;
 		}
 
 		// Calculate how much to increment the source index per each incrementation of the target index.
@@ -163,18 +170,24 @@ impl AudioBuffer {
 
 	/// Modify the sample rate of the buffer..
 	fn apply_sample_rate_modification(&mut self, sample_rate:u32) {
-		self.apply_duration_modification(1.0 / self.sample_rate as f32 * sample_rate as f32);
-		self.sample_rate = sample_rate;
+		if self.sample_rate != sample_rate {
+			self.apply_duration_modification(1.0 / self.sample_rate as f32 * sample_rate as f32);
+			self.sample_rate = sample_rate;
+		}
 	}
 
 	/// Modify the channel count of the buffer.
 	fn apply_channel_count_modification(&mut self, channel_count:usize) {
 
+		// Size same.
+		if channel_count == self.channel_count {
+		}
+
 		// Zero size.
-		if channel_count == 0 || self.channel_count == 0 {
+		else if channel_count == 0 || self.channel_count == 0 {
 			self.data = Vec::new();
 		}
-		
+
 		// Size down
 		else if channel_count < self.channel_count {
 			self.data = self.data.chunks(self.channel_count).map(|chunk| &chunk[..channel_count]).flatten().cloned().collect();
@@ -184,7 +197,8 @@ impl AudioBuffer {
 		else {
 			let mut new_data:Vec<f32> = Vec::with_capacity(self.data.len() / self.channel_count * channel_count);
 			let mut cursor:usize = 0;
-			while cursor < self.data.len() {
+			let cursor_end:usize = self.data.len() - (self.channel_count - 1);
+			while cursor < cursor_end {
 				new_data.extend_from_slice(&self.data[cursor..cursor + self.channel_count]);
 				for addition_index in 0..channel_count - self.channel_count {
 					new_data.push(self.data[cursor + (addition_index % self.channel_count)]);
@@ -209,6 +223,11 @@ impl AudioBuffer {
 	/// Get the sample-rate in samples per second.
 	pub fn sample_rate(&self) -> u32 {
 		self.sample_rate
+	}
+
+	/// Get the duration of the sample.
+	pub fn duration(&self) -> Duration {
+		Duration::from_secs_f32(self.data.len() as f32 / self.channel_count as f32 / self.sample_rate as f32)
 	}
 
 	/// Get the unprocessed data flat.
@@ -249,9 +268,31 @@ impl AudioBuffer {
 		self.raw_channels_data()
 	}
 
+	/// Take a specific duration of data.
+	pub fn take_processed_data<T>(&mut self, duration:T) -> Vec<f32> where T:AudioBufferDataLength {
+		self.apply_effects();
+		self.data.drain(..duration.as_buffer_length(self).min(self.data.len())).collect()
+	}
+
 	#[cfg(test)]
 	/// Get the amount of modifications scheduled.
 	pub(super) fn mod_count(&self) -> usize {
 		self.modifications.len()
+	}
+}
+
+
+
+pub trait AudioBufferDataLength {
+	fn as_buffer_length(self, buffer:&AudioBuffer) -> usize;
+}
+impl AudioBufferDataLength for usize {
+	fn as_buffer_length(self, buffer:&AudioBuffer) -> usize {
+		self * buffer.channel_count
+	}
+}
+impl AudioBufferDataLength for Duration {
+	fn as_buffer_length(self, buffer:&AudioBuffer) -> usize {
+		(self.as_secs_f32() * buffer.sample_rate as f32) as usize * buffer.channel_count
 	}
 }
