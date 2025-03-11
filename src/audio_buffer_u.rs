@@ -1,8 +1,12 @@
 #[cfg(test)]
 mod tests {
-	use crate::AudioBuffer;
+	use std::time::Duration;
+
+use crate::AudioBuffer;
 
 
+
+	/* CONSTRUCTOR TESTS */
 
 	#[test]
 	fn test_constructor_from_samples() {
@@ -42,5 +46,40 @@ mod tests {
 	fn test_constructor_from_channels_bad_data() {
 		let buffer:AudioBuffer = AudioBuffer::from_channels(vec![vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5], vec![0.0, 0.1, 0.2, 0.3]], 100);
 		assert_eq!(buffer.raw_channels_data(), vec![vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5], vec![0.0, 0.1, 0.2, 0.3, 0.0, 0.0]]);
+	}
+
+
+
+	/* DATA GETTER TESTS */
+
+	#[test]
+	fn test_take_all() {
+		const RAW_SAMPLES:&[f32] = &[1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0, -1.0, -1.0, -1.0, 0.0, 0.0, 0.0];
+
+		let mut buffer:AudioBuffer = AudioBuffer::from_samples(RAW_SAMPLES.to_vec(), 1, 10);
+		assert_eq!(buffer.raw_data(), RAW_SAMPLES);
+		assert_eq!(buffer.processed_data(), RAW_SAMPLES);
+	}
+
+	#[test]
+	fn test_take_some() {
+		const RAW_SAMPLES:&[f32] = &[1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0, -1.0, -1.0, -1.0, 0.0, 0.0, 0.0];
+
+		let mut buffer:AudioBuffer = AudioBuffer::from_samples(RAW_SAMPLES.to_vec(), 1, 10);
+		assert_eq!(buffer.raw_data(), RAW_SAMPLES);
+		assert_eq!(buffer.take_processed_data(Duration::from_millis(500)), RAW_SAMPLES[..5]);
+		assert_eq!(buffer.raw_data(), RAW_SAMPLES);
+		assert_eq!(buffer.take_processed_data(5), RAW_SAMPLES[5..10]);
+	}
+
+	#[test]
+	fn test_take_drain() {
+		const RAW_SAMPLES:&[f32] = &[1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, -1.0, -1.0, -1.0, -1.0, 0.0, 0.0, 0.0];
+
+		let mut buffer:AudioBuffer = AudioBuffer::from_samples(RAW_SAMPLES.to_vec(), 1, 10).drain_progression();
+		assert_eq!(buffer.raw_data(), RAW_SAMPLES);
+		assert_eq!(buffer.take_processed_data(Duration::from_millis(500)), RAW_SAMPLES[..5]);
+		assert_eq!(buffer.raw_data(), &RAW_SAMPLES[5..]);
+		assert_eq!(buffer.take_processed_data(5), RAW_SAMPLES[5..10]);
 	}
 }

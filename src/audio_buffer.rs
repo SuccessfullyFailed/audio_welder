@@ -4,12 +4,17 @@ use std::{ error::Error, ops::Add, time::Duration };
 
 
 #[derive(Clone, PartialEq)]
+enum ProgressionTracker { Cursor(usize), Drain }
+
+
+
+#[derive(Clone, PartialEq)]
 pub struct AudioBuffer {
 	data:Vec<f32>,
 	channel_count:usize,
 	sample_rate:u32,
-
-	effects:Vec<Box<dyn AudioEffect>>
+	effects:Vec<Box<dyn AudioEffect>>,
+	progression_tracker:ProgressionTracker
 }
 impl AudioBuffer {
 
@@ -21,8 +26,8 @@ impl AudioBuffer {
 			data: samples,
 			channel_count,
 			sample_rate,
-
-			effects: Vec::new()
+			effects: Vec::new(),
+			progression_tracker: ProgressionTracker::Cursor(0)
 		}
 	}
 
@@ -66,6 +71,10 @@ impl AudioBuffer {
 		Ok(AudioBuffer::from_samples(sample_data, spec.channels as usize, spec.sample_rate))
 	}
 
+
+
+	/* BUILDER METHODS */
+
 	/// Return self with a new sample rate and channel count.
 	pub fn resampled(mut self, sample_rate:u32, channel_count:usize) -> Self {
 		let sample_rate_multiplier:f32 = 1.0 / self.sample_rate as f32 * sample_rate as f32;
@@ -79,6 +88,15 @@ impl AudioBuffer {
 			channel_count_modifier.apply_to(&mut self.data, &mut self.sample_rate, &mut self.channel_count);
 			sample_rate_modifier.apply_to(&mut self.data, &mut self.sample_rate, &mut self.channel_count);
 		}
+		self
+	}
+
+	/// Return self with draining progression tracker.
+	pub fn drain_progression(mut self) -> Self {
+		if let ProgressionTracker::Cursor(cursor) = self.progression_tracker {
+			self.data.drain(..cursor);
+		}
+		self.progression_tracker = ProgressionTracker::Drain;
 		self
 	}
 
@@ -193,7 +211,17 @@ impl AudioBuffer {
 	/// Take a specific duration of data.
 	pub fn take_processed_data<T>(&mut self, duration:T) -> Vec<f32> where T:AudioBufferDataLength {
 		self.apply_effects();
-		self.data.drain(..duration.as_buffer_length(self).min(self.data.len())).collect()
+		let duration_buffer_length:usize = duration.as_buffer_length(self).min(self.data.len());
+		match &mut self.progression_tracker {
+			ProgressionTracker::Cursor(cursor) => {
+				let start:usize = *cursor;
+				*cursor += duration_buffer_length;
+				self.data[start..*cursor].to_vec()
+			},
+			ProgressionTracker::Drain => {
+				self.data.drain(..duration_buffer_length).collect()
+			}
+		}
 	}
 
 	#[cfg(test)]
