@@ -10,7 +10,7 @@ pub struct StereoShaper {
 	right_to_right:f32, 
 	left_to_right:f32,
 	right_to_left:f32,
-	target_channel_count:Option<usize>
+	target_channel_count:Option<f32>
 }
 impl StereoShaper {
 
@@ -34,22 +34,51 @@ impl StereoShaper {
 			right_to_right: 1.0,
 			left_to_right: 1.0,
 			right_to_left: 1.0,
-			target_channel_count: Some(channel_count)
+			target_channel_count: Some(channel_count as f32)
 		}
 	}
 }
 impl AudioEffect for StereoShaper {
+
+	/* PROPERTY GETTER METHODS */
 
 	/// Get the ID of the effect.
 	fn id(&self) -> usize {
 		self.id
 	}
 
+	/// Return the time multiplier of this effect.
+	fn sample_multiplier(&self, _sample_rate:u32, channel_count:usize) -> f32 {
+		1.0 / channel_count as f32 * self.target_channel_count.unwrap_or(channel_count as f32)
+	}
+    
+	/// Clone the effect into a box.
+	fn boxed(&self) -> Box<dyn AudioEffect> {
+		Box::new(StereoShaper {
+			id: create_effect_id(),
+			left_to_left: self.left_to_left,
+			right_to_right: self.right_to_right,
+			left_to_right: self.left_to_right,
+			right_to_left: self.right_to_left,
+			target_channel_count: self.target_channel_count.clone()
+		})
+	}
+
+	/// Allow downcasting.
+	fn as_any(&self) -> &dyn Any {
+		self
+	}
+
+
+
+	/* USAGE METHODS */
+
 	/// Apply the effect to the given buffer.
 	fn apply_to(&mut self, data:&mut Vec<f32>, _sample_rate:&mut u32, channel_count:&mut usize) {
 
 		// Modify channel count.
 		if let Some(target_channel_count) = self.target_channel_count {
+			let target_channel_count:usize = target_channel_count as usize;
 			if *channel_count != target_channel_count {
 				if *channel_count == 0 || target_channel_count == 0 {
 					*data = Vec::new();
@@ -68,7 +97,7 @@ impl AudioEffect for StereoShaper {
 					}
 					*data = new_data;
 				}
-				*channel_count = target_channel_count;
+				*channel_count = target_channel_count as usize;
 			}
 		}
 
@@ -93,25 +122,47 @@ impl AudioEffect for StereoShaper {
 		}
 	}
 
-	/// Return the time multiplier of this effect.
-	fn sample_multiplier(&self, _sample_rate:u32, channel_count:usize) -> f32 {
-		1.0 / channel_count as f32 * self.target_channel_count.unwrap_or(channel_count) as f32
-	}
-    
-	/// Clone the effect into a box.
-	fn boxed(&self) -> Box<dyn AudioEffect> {
-		Box::new(StereoShaper {
-			id: create_effect_id(),
-			left_to_left: self.left_to_left,
-			right_to_right: self.right_to_right,
-			left_to_right: self.left_to_right,
-			right_to_left: self.right_to_left,
-			target_channel_count: self.target_channel_count.clone()
-		})
+
+
+	/* SETTING METHODS */
+
+	/// Get a list of settings with their names.
+	fn settings(&self) -> Vec<(&str, &f32)> {
+		if let Some(target_channel_count) = &self.target_channel_count {
+			vec![
+				("left_to_left", &self.left_to_left),
+				("right_to_right", &self.right_to_right),
+				("left_to_right", &self.left_to_right),
+				("right_to_left", &self.right_to_left),
+				("target_channel_count", target_channel_count)
+			]	
+		} else {
+			vec![
+				("left_to_left", &self.left_to_left),
+				("right_to_right", &self.right_to_right),
+				("left_to_right", &self.left_to_right),
+				("right_to_left", &self.right_to_left)
+			]
+		}
 	}
 
-	/// Allow downcasting.
-	fn as_any(&self) -> &dyn Any {
-		self
+	/// Get a mutable list of settings with their names.
+	fn settings_mut(&mut self) -> Vec<(&str, &mut f32)> {
+		if let Some(target_channel_count) = &mut self.target_channel_count {
+			vec![
+				("left_to_left", &mut self.left_to_left),
+				("right_to_right", &mut self.right_to_right),
+				("left_to_right", &mut self.left_to_right),
+				("right_to_left", &mut self.right_to_left),
+				("target_channel_count", target_channel_count)
+			]	
+		} else {
+			vec![
+				("left_to_left", &mut self.left_to_left),
+				("right_to_right", &mut self.right_to_right),
+				("left_to_right", &mut self.left_to_right),
+				("right_to_left", &mut self.right_to_left)
+			]
+		}
 	}
 }

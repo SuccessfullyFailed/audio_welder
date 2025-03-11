@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-	use crate::AudioBuffer;
+	use crate::{ AudioBuffer, AudioEffect, VolumeAmplifier };
 
 
 
@@ -48,5 +48,11 @@ mod tests {
 			buffer.apply_effects();
 		}
 		assert_eq!(buffer.processed_data(), &saw_shape);
+	}
+
+	#[test]
+	fn test_settings() {
+		VolumeAmplifier::new(1.0).settings_test();
+		VolumeAmplifier::new_maximizer().settings_test();
 	}
 }

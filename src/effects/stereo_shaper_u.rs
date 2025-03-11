@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-	use crate::AudioBuffer;
+	use crate::{ AudioBuffer, AudioEffect, StereoShaper };
 
 
 
@@ -70,4 +70,12 @@ mod tests {
 		assert_eq!(buffer.channel_count(), 2);
 	}
 
+
+
+	/* SETTINGS */
+	
+	#[test]
+	fn test_settings() {
+		StereoShaper::new(1.0, 1.0, 1.0, 1.0).settings_test();
+	}
 }

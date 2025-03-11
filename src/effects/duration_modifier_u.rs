@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-	use crate::AudioBuffer;
+	use crate::{ AudioBuffer, AudioEffect, DurationModifier };
 
 	
 
@@ -103,5 +103,15 @@ mod tests {
 			println!("{left}, {right}");
 			assert!((*left - *right) < 0.01);
 		}
+	}
+
+
+
+	/* SETTINGS */
+	
+	#[test]
+	fn test_settings() {
+		DurationModifier::new(1.0).settings_test();
+		DurationModifier::new_sample_rate_modifier(800).settings_test();
 	}
 }
