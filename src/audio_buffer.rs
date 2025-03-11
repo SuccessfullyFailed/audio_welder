@@ -1,5 +1,5 @@
 use crate::{AudioEffect, DurationModifier, StereoShaper, VolumeAmplifier};
-use std::{ error::Error, time::Duration };
+use std::{ error::Error, ops::Add, time::Duration };
 
 
 
@@ -64,6 +64,22 @@ impl AudioBuffer {
 
 		// Return audio buffer.
 		Ok(AudioBuffer::from_samples(sample_data, spec.channels as usize, spec.sample_rate))
+	}
+
+	/// Return self with a new sample rate and channel count.
+	pub fn resampled(mut self, sample_rate:u32, channel_count:usize) -> Self {
+		let sample_rate_multiplier:f32 = 1.0 / self.sample_rate as f32 * sample_rate as f32;
+		let channel_count_multiplier:f32 = 1.0 / self.channel_count as f32 * channel_count as f32;
+		let mut sample_rate_modifier:DurationModifier = DurationModifier::new_sample_rate_modifier(sample_rate);
+		let mut channel_count_modifier:StereoShaper = StereoShaper::new_channel_count_modifier(channel_count);
+		if sample_rate_multiplier < channel_count_multiplier {
+			sample_rate_modifier.apply_to(&mut self.data, &mut self.sample_rate, &mut self.channel_count);
+			channel_count_modifier.apply_to(&mut self.data, &mut self.sample_rate, &mut self.channel_count);
+		} else {
+			channel_count_modifier.apply_to(&mut self.data, &mut self.sample_rate, &mut self.channel_count);
+			sample_rate_modifier.apply_to(&mut self.data, &mut self.sample_rate, &mut self.channel_count);
+		}
+		self
 	}
 
 
@@ -184,6 +200,15 @@ impl AudioBuffer {
 	/// Get the amount of modifications scheduled.
 	pub(super) fn mod_count(&self) -> usize {
 		self.effects.len()
+	}
+}
+impl Add<AudioBuffer> for AudioBuffer {
+	type Output = AudioBuffer;
+
+	fn add(mut self, rhs:AudioBuffer) -> Self::Output {
+		let rhs:AudioBuffer = rhs.resampled(self.sample_rate, self.channel_count);
+		self.data.extend(rhs.data);
+		self
 	}
 }
 
