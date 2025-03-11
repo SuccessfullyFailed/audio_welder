@@ -60,15 +60,19 @@ impl AudioBuffer {
 		// Read the WAV file using hound crate.
 		let wav_reader:WavReader<BufReader<File>> = WavReader::open(file_path)?;
 		let spec:WavSpec = wav_reader.spec();
+		let channel_count:usize = spec.channels as usize;
 		
 		// Retrieve the audio data.
-		let sample_data:Vec<f32> = match spec.sample_format {
+		let mut sample_data:Vec<f32> = match spec.sample_format {
 			SampleFormat::Int => wav_reader.into_samples::<i16>().map(|sample| sample.unwrap() as f32 / i16::MAX as f32).collect(),
 			SampleFormat::Float => wav_reader.into_samples::<f32>().map(|s| s.unwrap()).collect(),
 		};
+		if sample_data.len() % channel_count != 0 {
+			sample_data.extend(vec![0.0; channel_count - (sample_data.len() % channel_count)]);
+		}
 
 		// Return audio buffer.
-		Ok(AudioBuffer::from_samples(sample_data, spec.channels as usize, spec.sample_rate))
+		Ok(AudioBuffer::from_samples(sample_data, channel_count, spec.sample_rate))
 	}
 
 
@@ -165,9 +169,18 @@ impl AudioBuffer {
 		self.sample_rate
 	}
 
+	/// Get the total duration multiplier created by the effects.
+	fn effects_duration_multiplier(&self) -> f32 {
+		let mut effect_sample_multiplier:f32 = 1.0;
+		for effect in &self.effects {
+			effect_sample_multiplier *= effect.sample_multiplier(self.sample_rate, self.channel_count);
+		}
+		effect_sample_multiplier
+	}
+
 	/// Get the duration of the sample.
 	pub fn duration(&self) -> Duration {
-		Duration::from_secs_f32(self.data.len() as f32 / self.channel_count as f32 / self.sample_rate as f32)
+		Duration::from_secs_f32(self.data.len() as f32 / self.channel_count as f32 / self.sample_rate as f32 * self.effects_duration_multiplier())
 	}
 
 	/// Get the unprocessed data flat.
@@ -211,13 +224,9 @@ impl AudioBuffer {
 	/// Take a specific duration of data.
 	pub fn take_processed_data<T>(&mut self, duration:T) -> Vec<f32> where T:AudioBufferDataLength {
 
-		// Calculate required sample-count.
-		let mut effect_sample_multiplier:f32 = 1.0;
-		for effect in &self.effects {
-			effect_sample_multiplier *= effect.sample_multiplier(self.sample_rate, self.channel_count);
-		}
+		// Calculate sub-sample size.
 		let target_sample_len:usize = duration.as_buffer_length(self).min(self.data.len());
-		let target_sample_count:usize = (target_sample_len as f32 / effect_sample_multiplier) as usize;
+		let target_sample_count:usize = (target_sample_len as f32 / self.effects_duration_multiplier()) as usize;
 
 		// Grab sub-sample.
 		let mut sub_buffer:AudioBuffer = AudioBuffer::from_samples(

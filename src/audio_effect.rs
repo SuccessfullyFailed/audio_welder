@@ -19,6 +19,9 @@ pub trait AudioEffect:Send + Sync {
 
 	/// Get the ID of the effect.
 	fn id(&self) -> usize;
+
+	/// Get the name of the effect.
+	fn name(&self) -> &str;
     
 	/// Clone the effect into a box.
 	fn boxed(&self) -> Box<dyn AudioEffect>;

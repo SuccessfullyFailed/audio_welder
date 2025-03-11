@@ -38,6 +38,11 @@ impl AudioEffect for DurationModifier {
 		self.id
 	}
 
+	/// Get the name of the effect.
+	fn name(&self) -> &str {
+		"duration_modifier"
+	}
+
 	/// Return the time multiplier of this effect.
 	fn sample_multiplier(&self, sample_rate:u32, _channel_count:usize) -> f32 {
 		(1.0 / sample_rate as f32 * self.target_sample_rate.unwrap_or(sample_rate as f32) as f32) * self.duration_multiplier
@@ -62,22 +67,23 @@ impl AudioEffect for DurationModifier {
 	/* USAGE METHODS */
 
 	/// Apply the effect to the given buffer.
-	fn apply_to(&mut self, data:&mut Vec<f32>, sample_rate:&mut u32, _channel_count:&mut usize) {
+	fn apply_to(&mut self, data:&mut Vec<f32>, sample_rate:&mut u32, channel_count:&mut usize) {
 
 		// Reverse data if factor is less than 0.
-		let mut multiplier:f32 = self.sample_multiplier(*sample_rate, *_channel_count);
+		let mut multiplier:f32 = self.sample_multiplier(*sample_rate, *channel_count);
 		if multiplier < 0.0 {
 			data.reverse();
 			multiplier = multiplier.abs();
 		}
 
 		// Return if no change needed.
-		if multiplier == 1.0 {
+		if multiplier == 1.0 || data.is_empty() {
 			return;
 		}
 
 		// Calculate how much to increment the source index per each incrementation of the target index.
-		let source_sample_count:f32 = data.len() as f32;
+		let channel_data:Vec<&[f32]> = data.chunks(*channel_count).filter(|chunk| chunk.len() == *channel_count).collect();
+		let source_sample_count:f32 = channel_data.len() as f32;
 		let target_sample_count:f32 = (source_sample_count * multiplier).floor();
 		let source_index_increment:f32 = 1.0 / multiplier;
 		let source_index_max:usize = source_sample_count as usize - 1;
@@ -86,10 +92,12 @@ impl AudioEffect for DurationModifier {
 		let mut new_data:Vec<f32> = Vec::with_capacity(target_sample_count as usize);
 		let mut source_index:f32 = 0.0;
 		while source_index < source_sample_count {
-			let source_index_left:usize = source_index.floor() as usize;
+			let source_index_left:usize = (source_index.floor() as usize).min(source_index_max);
 			let source_index_right:usize = (source_index_left + 1).min(source_index_max);
 			let source_index_fact:f32 = source_index % 1.0;
-			new_data.push(data[source_index_left] + (data[source_index_right] - data[source_index_left]) * source_index_fact);
+			for channel_index in 0..*channel_count {
+				new_data.push(channel_data[source_index_left][channel_index] + (channel_data[source_index_right][channel_index] - channel_data[source_index_left][channel_index]) * source_index_fact);
+			}
 			
 			source_index += source_index_increment;
 		}
@@ -99,23 +107,6 @@ impl AudioEffect for DurationModifier {
 			*sample_rate = rate as u32;
 		}
 		*data = new_data;
-	}
-
-	// Try to combine two instances of the audio effect into one.
-	fn combine(&self, other:&dyn AudioEffect) -> Option<Box<dyn AudioEffect>> {
-		if let Some(other) = other.as_any().downcast_ref::<DurationModifier>() {
-			Some(
-				Box::new(
-					if let Some(target_sample_rate) = other.target_sample_rate {
-						DurationModifier { id: create_effect_id(), target_sample_rate: Some(target_sample_rate), duration_multiplier: other.duration_multiplier }
-					} else {
-						DurationModifier { id: create_effect_id(), target_sample_rate: self.target_sample_rate, duration_multiplier: self.duration_multiplier * other.duration_multiplier }
-					}
-				)
-			)
-		} else {
-			None
-		}
 	}
 
 
@@ -149,4 +140,12 @@ impl AudioEffect for DurationModifier {
 			]
 		}
 	}
+}
+
+#[cfg(test)]
+#[test]
+fn test() {
+	let mut buffer = crate::AudioBuffer::from_wav("D:/EffortAnnihilator Data/audio/audio_board/music/murfreesboro.wav").unwrap();
+	buffer.add_effect(DurationModifier::new(2.0));
+	crate::OutputDevice::default().play(buffer).unwrap();
 }

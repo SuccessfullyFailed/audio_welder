@@ -42,6 +42,11 @@ impl AudioEffect for VolumeAmplifier {
 	fn id(&self) -> usize {
 		self.id
 	}
+
+	/// Get the name of the effect.
+	fn name(&self) -> &str {
+		"volume_amplifier"
+	}
 	
 	/// Clone the effect into a box.
 	fn boxed(&self) -> Box<dyn AudioEffect> {

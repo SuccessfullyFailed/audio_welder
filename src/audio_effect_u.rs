@@ -16,8 +16,6 @@ mod tests {
 		assert_eq!(buffer.mod_count(), 1);
 		buffer.multiply_duration(0.5);
 		assert_eq!(buffer.mod_count(), 2);
-		buffer.multiply_duration(0.5);
-		assert_eq!(buffer.mod_count(), 2);
 		buffer.multiply_volume(0.5);
 		assert_eq!(buffer.mod_count(), 3);
 		buffer.apply_effects();
