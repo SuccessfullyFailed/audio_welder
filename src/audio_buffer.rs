@@ -210,18 +210,38 @@ impl AudioBuffer {
 
 	/// Take a specific duration of data.
 	pub fn take_processed_data<T>(&mut self, duration:T) -> Vec<f32> where T:AudioBufferDataLength {
-		self.apply_effects();
-		let duration_buffer_length:usize = duration.as_buffer_length(self).min(self.data.len());
-		match &mut self.progression_tracker {
-			ProgressionTracker::Cursor(cursor) => {
-				let start:usize = *cursor;
-				*cursor += duration_buffer_length;
-				self.data[start..*cursor].to_vec()
+
+		// Calculate required sample-count.
+		let mut effect_sample_multiplier:f32 = 1.0;
+		for effect in &self.effects {
+			effect_sample_multiplier *= effect.sample_multiplier(self.sample_rate, self.channel_count);
+		}
+		let target_sample_len:usize = duration.as_buffer_length(self).min(self.data.len());
+		let target_sample_count:usize = (target_sample_len as f32 / effect_sample_multiplier) as usize;
+
+		// Grab sub-sample.
+		let mut sub_buffer:AudioBuffer = AudioBuffer::from_samples(
+				match &mut self.progression_tracker {
+				ProgressionTracker::Cursor(cursor) => {
+					let start:usize = *cursor;
+					*cursor = (*cursor + target_sample_count).min(self.data.len() - 1);
+					self.data[start..*cursor].to_vec()
+				},
+				ProgressionTracker::Drain => {
+					self.data.drain(..target_sample_count).collect()
+				}
 			},
-			ProgressionTracker::Drain => {
-				self.data.drain(..duration_buffer_length).collect()
+			self.channel_count,
+			self.sample_rate
+		);
+
+		// Apply effects.
+		if !sub_buffer.data.is_empty() {
+			for effect in &mut self.effects {
+				effect.apply_to(&mut sub_buffer.data, &mut sub_buffer.sample_rate, &mut sub_buffer.channel_count);
 			}
 		}
+		sub_buffer.data
 	}
 
 	#[cfg(test)]
