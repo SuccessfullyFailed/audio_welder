@@ -30,15 +30,14 @@ impl OutputDevice {
 
 	/// Play a wav file through this device.
 	pub fn play_wav(&self, wav:&str) -> Result<(), Box<dyn Error>> {
-		self.play(AudioBuffer::from_wav(wav)?.clone())
+		self.play(AudioBuffer::wav(wav)?.clone())
 	}
 
 	/// Play an audio buffer through this device.
 	pub fn play(&self, mut buffer:AudioBuffer) -> Result<(), Box<dyn Error>> {
 		
 		// Modify buffer sample to fit device.
-		buffer.resample_sample_rate(self.device.sample_rate);
-		buffer.resample_channel_count(self.device.channel_count);
+		self.prepare_buffer(&mut buffer);
 		let buffer_duration:Duration = buffer.duration();
 
 		// Create output stream.
@@ -51,7 +50,7 @@ impl OutputDevice {
 				buffer_size: cpal_device.default_output_config().unwrap().config().buffer_size
 			},
 			move |data, _| {
-				let new_data:Vec<f32> = buffer.take_processed_data(data.len() / channel_count);
+				let new_data:Vec<f32> = buffer.take_processed_data_flat(data.len() / channel_count);
 				data[..new_data.len()].clone_from_slice(&new_data);
 			},
 			|err:StreamError| panic!("{err}"),

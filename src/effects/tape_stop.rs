@@ -15,7 +15,7 @@ pub struct TapeStop {
 	speed:f32,
 	buffer_cache_cursor:f32,
 	required_cache_size:usize,
-	buffer_cache:Vec<f32>
+	buffer_cache:Vec<Vec<f32>>
 }
 impl TapeStop {
 
@@ -90,7 +90,7 @@ impl AudioEffect for TapeStop {
 	/* USAGE METHODS */
 
 	/// Apply the effect to the given buffer.
-	fn apply_to(&mut self, data:&mut Vec<f32>, sample_rate:&mut u32, channel_count:&mut usize) {
+	fn apply_to(&mut self, data:&mut Vec<Vec<f32>>, sample_rate:&mut u32, channel_count:&mut usize) {
 		match self.effect_status() {
 			EffectStatus::None => {
 				if self.speed != 1.0 {
@@ -104,22 +104,26 @@ impl AudioEffect for TapeStop {
 					self.required_cache_size = (self.effect_duration_ms * *sample_rate as f32) as usize * *channel_count;
 				}
 				if self.buffer_cache.len() < self.required_cache_size {
-					self.buffer_cache.extend_from_slice(data);
+					for channel_index in 0..*channel_count {
+						self.buffer_cache[channel_index].extend_from_slice(&data[channel_index]);
+					}
 				}
 
 				// Apply effect.
-				let data_duration_ms:f32 = (data.len() as f32 / *channel_count as f32) / *sample_rate as f32 * 1000.0;
-				for source_sample_index in 0..data.len() {
+				let data_duration_ms:f32 = (data[0].len() as f32 / *channel_count as f32) / *sample_rate as f32 * 1000.0;
+				for source_sample_index in 0..data[0].len() {
 					self.buffer_cache_cursor += self.speed;
 					let source_index_left:usize = (self.buffer_cache_cursor.floor() as usize).min(self.buffer_cache.len() - 2);
 					let source_index_right:usize = source_index_left + 1;
 					let source_index_fact:f32 = self.buffer_cache_cursor % 1.0;
-					data[source_sample_index] = self.buffer_cache[source_index_left] + (self.buffer_cache[source_index_right] - self.buffer_cache[source_index_left]) * source_index_fact;
+					for channel_index in 0..*channel_count {
+						data[channel_index][source_sample_index] = self.buffer_cache[channel_index][source_index_left] + (self.buffer_cache[channel_index][source_index_right] - self.buffer_cache[channel_index][source_index_left]) * source_index_fact;
+					}
 				}
 				self.speed = (self.speed - (1.0 / self.effect_duration_ms * data_duration_ms)).max(0.0);
 			},
 			EffectStatus::Finished => {
-				data.iter_mut().for_each(|sample| *sample = 0.0);
+				data.iter_mut().for_each(|channel_data| channel_data.iter_mut().for_each(|sample| *sample = 0.0));
 				self.buffer_cache_cursor = 0.0;
 				self.required_cache_size = 0;
 				self.buffer_cache = Vec::new();

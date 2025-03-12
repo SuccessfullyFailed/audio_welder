@@ -67,12 +67,12 @@ impl AudioEffect for VolumeAmplifier {
 	/* USAGE METHODS */
 
 	/// Apply the effect to the given buffer.
-	fn apply_to(&mut self, data:&mut Vec<f32>, _sample_rate:&mut u32, _channel_count:&mut usize) {
+	fn apply_to(&mut self, data:&mut Vec<Vec<f32>>, _sample_rate:&mut u32, _channel_count:&mut usize) {
 		let mut multiplier:f32 = 1.0;
 
 		if let Some(target_volume) = self.maximize_target_volume {
 			let mut max:f32 = 0.0;
-			for sample in data.iter() {
+			for sample in data.iter().flatten() {
 				let sample_abs:f32 = sample.abs();
 				if sample_abs > max {
 					max = sample_abs;
@@ -82,7 +82,7 @@ impl AudioEffect for VolumeAmplifier {
 		}
 		multiplier *= self.multiplier;
 		if multiplier != 1.0 {
-			data.iter_mut().for_each(|sample| *sample *= multiplier);
+			data.iter_mut().for_each(|channel| channel.iter_mut().for_each(|sample| *sample *= multiplier));
 		}
 	}
     

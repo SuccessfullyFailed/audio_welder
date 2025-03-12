@@ -67,7 +67,8 @@ impl AudioEffect for DurationModifier {
 	/* USAGE METHODS */
 
 	/// Apply the effect to the given buffer.
-	fn apply_to(&mut self, data:&mut Vec<f32>, sample_rate:&mut u32, channel_count:&mut usize) {
+	fn apply_to(&mut self, data:&mut Vec<Vec<f32>>, sample_rate:&mut u32, channel_count:&mut usize) {
+		print!("\t\t\t\tFROM {} TO ", data[0].len());
 
 		// Reverse data if factor is less than 0.
 		let mut multiplier:f32 = self.sample_multiplier(*sample_rate, *channel_count);
@@ -82,21 +83,20 @@ impl AudioEffect for DurationModifier {
 		}
 
 		// Calculate how much to increment the source index per each incrementation of the target index.
-		let channel_data:Vec<&[f32]> = data.chunks(*channel_count).filter(|chunk| chunk.len() == *channel_count).collect();
-		let source_sample_count:f32 = channel_data.len() as f32;
+		let source_sample_count:f32 = data[0].len() as f32;
 		let target_sample_count:f32 = (source_sample_count * multiplier).floor();
 		let source_index_increment:f32 = 1.0 / multiplier;
 		let source_index_max:usize = source_sample_count as usize - 1;
 
 		// For each new sample, calculate a new sample based on the progress between samples in the source.
-		let mut new_data:Vec<f32> = Vec::with_capacity(target_sample_count as usize);
+		let mut new_data:Vec<Vec<f32>> = vec![Vec::with_capacity(target_sample_count as usize); *channel_count];
 		let mut source_index:f32 = 0.0;
 		while source_index < source_sample_count {
 			let source_index_left:usize = (source_index.floor() as usize).min(source_index_max);
 			let source_index_right:usize = (source_index_left + 1).min(source_index_max);
 			let source_index_fact:f32 = source_index % 1.0;
 			for channel_index in 0..*channel_count {
-				new_data.push(channel_data[source_index_left][channel_index] + (channel_data[source_index_right][channel_index] - channel_data[source_index_left][channel_index]) * source_index_fact);
+				new_data[channel_index].push(data[channel_index][source_index_left] + (data[channel_index][source_index_right] - data[channel_index][source_index_left]) * source_index_fact);
 			}
 			
 			source_index += source_index_increment;
@@ -106,6 +106,7 @@ impl AudioEffect for DurationModifier {
 		if let Some(rate) = self.target_sample_rate {
 			*sample_rate = rate as u32;
 		}
+		println!("{}", new_data[0].len());
 		*data = new_data;
 	}
 
@@ -140,12 +141,4 @@ impl AudioEffect for DurationModifier {
 			]
 		}
 	}
-}
-
-#[cfg(test)]
-#[test]
-fn test() {
-	let mut buffer = crate::AudioBuffer::from_wav("D:/EffortAnnihilator Data/audio/audio_board/music/murfreesboro.wav").unwrap();
-	buffer.add_effect(DurationModifier::new(2.0));
-	crate::OutputDevice::default().play(buffer).unwrap();
 }

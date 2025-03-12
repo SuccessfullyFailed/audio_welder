@@ -39,7 +39,7 @@ pub trait AudioEffect:Send + Sync {
 	/* USAGE METHODS */
 
 	/// Apply the effect to the given buffer.
-	fn apply_to(&mut self, data:&mut Vec<f32>, sample_rate:&mut u32, channel_count:&mut usize);
+	fn apply_to(&mut self, data:&mut Vec<Vec<f32>>, sample_rate:&mut u32, channel_count:&mut usize);
     
 	/// Try to combine two instances of the audio effect into one.
 	fn combine(&self, _other:&dyn AudioEffect) -> Option<Box<dyn AudioEffect>> {

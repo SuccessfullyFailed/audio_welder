@@ -13,7 +13,7 @@ mod tests {
 		let default_device:OutputDevice = OutputDevice::default();
 
 		// Prepare buffer.
-		let mut buffer:AudioBuffer = AudioBuffer::from_samples(RAW_SAMPLES.to_vec(), 1, 160);
+		let mut buffer:AudioBuffer = AudioBuffer::new(vec![RAW_SAMPLES.to_vec()], 160);
 		default_device.prepare_buffer(&mut buffer);
 		buffer.apply_effects();
 		
