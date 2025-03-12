@@ -77,7 +77,6 @@ mod tests {
 		let test_sample_rates:Vec<u32> = (0..20).map(|index| 1 << index).collect();
 		for in_sample_rate in &test_sample_rates {
 			for out_sample_rate in &test_sample_rates {
-				println!("{in_sample_rate} => {out_sample_rate}");
 				let mut buffer:AudioBuffer = AudioBuffer::new(vec![saw_shape.clone()], *in_sample_rate);
 				buffer.resample_sample_rate(*out_sample_rate);
 				buffer.apply_effects();

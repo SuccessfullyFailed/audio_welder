@@ -206,19 +206,22 @@ impl AudioBuffer {
 		// Calculate sub-sample size.
 		let sample_size:usize = self.sample_size();
 		let target_sample_len:usize = duration.as_buffer_length(self).min(sample_size);
-		let target_sample_count:usize = (target_sample_len as f32 / self.effects_duration_multiplier()) as usize;
+		let target_sample_len_before_effects:usize = (target_sample_len as f32 / self.effects_duration_multiplier()) as usize;
 
 		// Grab sub-sample.
 		let mut sub_data:Vec<Vec<f32>> = match &mut self.progression_tracker {
 			ProgressionTracker::Cursor(cursor) => {
 				let start:usize = *cursor;
-				*cursor = (*cursor + target_sample_count).min(sample_size);
+				*cursor = (*cursor + target_sample_len_before_effects).min(sample_size);
 				self.data.iter().map(|channel| channel[start..*cursor].to_vec()).collect::<Vec<Vec<f32>>>()
 			},
 			ProgressionTracker::Drain => {
-				self.data.iter_mut().map(|channel| channel.drain(..target_sample_count).collect()).collect::<Vec<Vec<f32>>>()
+				self.data.iter_mut().map(|channel| channel.drain(..target_sample_len_before_effects).collect()).collect::<Vec<Vec<f32>>>()
 			}
 		};
+		for channel in &mut sub_data {
+			channel.extend(vec![0.0; target_sample_len_before_effects - channel.len()]);
+		}
 
 		// Apply effects.
 		if !sub_data.is_empty() {
@@ -228,6 +231,19 @@ impl AudioBuffer {
 				effect.apply_to(&mut sub_data, &mut sample_rate, &mut channel_count);
 			}
 		}
+
+		// Stretch to target length.
+		for channel in &mut sub_data {
+			if channel.len() < target_sample_len {
+				let shortage:usize = target_sample_len - channel.len();
+				for insertion_index in 0..shortage {
+					let insertion_position:usize = insertion_index * channel.len() / shortage;
+					channel.insert(insertion_position, channel[insertion_position]);
+				}
+			}
+		}
+
+		// Return data.
 		sub_data
 	}
 

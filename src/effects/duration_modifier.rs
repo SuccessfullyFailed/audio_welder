@@ -106,7 +106,6 @@ impl AudioEffect for DurationModifier {
 		if let Some(rate) = self.target_sample_rate {
 			*sample_rate = rate as u32;
 		}
-		println!("{}", new_data[0].len());
 		*data = new_data;
 	}
 
