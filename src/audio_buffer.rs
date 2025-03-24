@@ -1,4 +1,4 @@
-use crate::{ AudioBufferDataLength, AudioEffect, DurationModifier, StereoShaper, VolumeAmplifier };
+use crate::{ AudioBufferDataLength, AudioEffect, AudioGenerator, DurationModifier, StereoShaper, VolumeAmplifier };
 use std::{ error::Error, ops::Add, time::Duration };
 
 
@@ -200,8 +200,16 @@ impl AudioBuffer {
 		self.raw_data()
 	}
 
-	/// Take a specific duration of data.
-	pub fn take_processed_data<T>(&mut self, duration:T) -> Vec<Vec<f32>> where T:AudioBufferDataLength {
+	#[cfg(test)]
+	/// Get the amount of modifications scheduled.
+	pub(super) fn mod_count(&self) -> usize {
+		self.effects.len()
+	}
+}
+impl AudioGenerator for AudioBuffer {
+
+	/// Take a specific amount of data.
+	fn take<T>(&mut self, duration:T) -> Vec<Vec<f32>> where T:AudioBufferDataLength {
 
 		// Calculate sub-sample size.
 		let sample_size:usize = self.sample_size();
@@ -241,38 +249,17 @@ impl AudioBuffer {
 					channel.insert(insertion_position, channel[insertion_position]);
 				}
 			}
+			if channel.len() > target_sample_len {
+				let overflow:usize = target_sample_len - channel.len();
+				for removal_index in 0..overflow {
+					let removal_position:usize = removal_index * channel.len() / overflow;
+					channel.remove(removal_position);
+				}
+			}
 		}
 
 		// Return data.
 		sub_data
-	}
-
-	/// Take a specific duration of data.
-	pub fn take_processed_data_flat<T>(&mut self, duration:T) -> Vec<f32> where T:AudioBufferDataLength {
-
-		// Get non-flat data.
-		let input_data:Vec<Vec<f32>> = self.take_processed_data(duration);
-		if input_data.is_empty() || input_data[0].is_empty() {
-			return Vec::new();
-		}
-		assert!(input_data.iter().all(|channel_data| channel_data.len() == input_data[0].len()));
-
-		// Flatten.
-		let mut output_data:Vec<f32> = Vec::with_capacity(input_data.len() * input_data[0].len());
-		for sample_index in 0..input_data[0].len() {
-			for channel_index in 0..input_data.len() {
-				output_data.push(input_data[channel_index][sample_index]);
-			}
-		}
-
-		// Return flat data.
-		output_data
-	}
-
-	#[cfg(test)]
-	/// Get the amount of modifications scheduled.
-	pub(super) fn mod_count(&self) -> usize {
-		self.effects.len()
 	}
 }
 impl Add<AudioBuffer> for AudioBuffer {

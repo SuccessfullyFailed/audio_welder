@@ -1,7 +1,7 @@
 use cpal::{ traits::{ DeviceTrait, StreamTrait }, Device as CpalDevice, Stream, StreamConfig, StreamError };
 use std::{ error::Error, thread::sleep, time::Duration };
+use crate::{ AudioBuffer, AudioGenerator };
 use super::audio_device::AudioDevice;
-use crate::AudioBuffer;
 
 
 
@@ -50,7 +50,7 @@ impl OutputDevice {
 				buffer_size: cpal_device.default_output_config().unwrap().config().buffer_size
 			},
 			move |data, _| {
-				let new_data:Vec<f32> = buffer.take_processed_data_flat(data.len() / channel_count);
+				let new_data:Vec<f32> = buffer.take_flat(data.len() / channel_count);
 				data[..new_data.len()].clone_from_slice(&new_data);
 			},
 			|err:StreamError| panic!("{err}"),

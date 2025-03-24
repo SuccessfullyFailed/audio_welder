@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
+	use crate::{ AudioBuffer, AudioGenerator };
 	use std::time::Duration;
-
-use crate::AudioBuffer;
 
 
 
@@ -48,9 +47,9 @@ use crate::AudioBuffer;
 
 		let mut buffer:AudioBuffer = AudioBuffer::new(vec![RAW_SAMPLES.to_vec()], 10);
 		assert_eq!(&buffer.raw_data()[0], RAW_SAMPLES);
-		assert_eq!(&buffer.take_processed_data(Duration::from_millis(500))[0], &RAW_SAMPLES[..5]);
+		assert_eq!(&buffer.take(Duration::from_millis(500))[0], &RAW_SAMPLES[..5]);
 		assert_eq!(&buffer.raw_data()[0], RAW_SAMPLES);
-		assert_eq!(&buffer.take_processed_data(5)[0], &RAW_SAMPLES[5..10]);
+		assert_eq!(&buffer.take(5)[0], &RAW_SAMPLES[5..10]);
 	}
 
 	#[test]
@@ -59,8 +58,8 @@ use crate::AudioBuffer;
 
 		let mut buffer:AudioBuffer = AudioBuffer::new(vec![RAW_SAMPLES.to_vec()], 10).drain_progression();
 		assert_eq!(&buffer.raw_data()[0], RAW_SAMPLES);
-		assert_eq!(&buffer.take_processed_data(Duration::from_millis(500))[0], &RAW_SAMPLES[..5]);
+		assert_eq!(&buffer.take(Duration::from_millis(500))[0], &RAW_SAMPLES[..5]);
 		assert_eq!(&buffer.raw_data()[0], &RAW_SAMPLES[5..]);
-		assert_eq!(&buffer.take_processed_data(5)[0], &RAW_SAMPLES[5..10]);
+		assert_eq!(&buffer.take(5)[0], &RAW_SAMPLES[5..10]);
 	}
 }
