@@ -1,4 +1,4 @@
-use crate::{AudioEffect, DurationModifier, StereoShaper, VolumeAmplifier};
+use crate::{ AudioBufferDataLength, AudioEffect, DurationModifier, StereoShaper, VolumeAmplifier };
 use std::{ error::Error, ops::Add, time::Duration };
 
 
@@ -205,7 +205,7 @@ impl AudioBuffer {
 
 		// Calculate sub-sample size.
 		let sample_size:usize = self.sample_size();
-		let target_sample_len:usize = duration.as_buffer_length(self).min(sample_size);
+		let target_sample_len:usize = duration.as_buffer_length(self.sample_rate).min(sample_size);
 		let target_sample_len_before_effects:usize = (target_sample_len as f32 / self.effects_duration_multiplier()) as usize;
 
 		// Grab sub-sample.
@@ -282,21 +282,5 @@ impl Add<AudioBuffer> for AudioBuffer {
 		let rhs:AudioBuffer = rhs.resampled(self.sample_rate, self.channel_count);
 		self.data.extend(rhs.data);
 		self
-	}
-}
-
-
-
-pub trait AudioBufferDataLength {
-	fn as_buffer_length(self, buffer:&AudioBuffer) -> usize;
-}
-impl AudioBufferDataLength for usize {
-	fn as_buffer_length(self, _buffer:&AudioBuffer) -> usize {
-		self
-	}
-}
-impl AudioBufferDataLength for Duration {
-	fn as_buffer_length(self, buffer:&AudioBuffer) -> usize {
-		(self.as_secs_f32() * buffer.sample_rate as f32) as usize
 	}
 }
