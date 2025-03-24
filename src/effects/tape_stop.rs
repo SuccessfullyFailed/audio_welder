@@ -102,6 +102,7 @@ impl AudioEffect for TapeStop {
 				// Grow data cache.
 				if self.buffer_cache_cursor == 0.0 {
 					self.required_cache_size = (self.effect_duration_ms * *sample_rate as f32) as usize * *channel_count;
+					self.buffer_cache = vec![Vec::with_capacity(self.required_cache_size); *channel_count];
 				}
 				if self.buffer_cache.len() < self.required_cache_size {
 					for channel_index in 0..*channel_count {
@@ -111,14 +112,15 @@ impl AudioEffect for TapeStop {
 
 				// Apply effect.
 				let data_duration_ms:f32 = (data[0].len() as f32 / *channel_count as f32) / *sample_rate as f32 * 1000.0;
-				for source_sample_index in 0..data[0].len() {
-					self.buffer_cache_cursor += self.speed;
-					let source_index_left:usize = (self.buffer_cache_cursor.floor() as usize).min(self.buffer_cache.len() - 2);
-					let source_index_right:usize = source_index_left + 1;
+				let max_cache_index:usize = self.buffer_cache[0].len() - 1;
+				for target_sample_index in 0..data[0].len() {
+					let source_index_left:usize = self.buffer_cache_cursor.floor() as usize;
+					let source_index_right:usize = (source_index_left + 1).min(max_cache_index);
 					let source_index_fact:f32 = self.buffer_cache_cursor % 1.0;
 					for channel_index in 0..*channel_count {
-						data[channel_index][source_sample_index] = self.buffer_cache[channel_index][source_index_left] + (self.buffer_cache[channel_index][source_index_right] - self.buffer_cache[channel_index][source_index_left]) * source_index_fact;
+						data[channel_index][target_sample_index] = self.buffer_cache[channel_index][source_index_left] + (self.buffer_cache[channel_index][source_index_right] - self.buffer_cache[channel_index][source_index_left]) * source_index_fact;
 					}
+					self.buffer_cache_cursor += self.speed;
 				}
 				self.speed = (self.speed - (1.0 / self.effect_duration_ms * data_duration_ms)).max(0.0);
 			},

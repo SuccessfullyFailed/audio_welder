@@ -68,7 +68,6 @@ impl AudioEffect for DurationModifier {
 
 	/// Apply the effect to the given buffer.
 	fn apply_to(&mut self, data:&mut Vec<Vec<f32>>, sample_rate:&mut u32, channel_count:&mut usize) {
-		print!("\t\t\t\tFROM {} TO ", data[0].len());
 
 		// Reverse data if factor is less than 0.
 		let mut multiplier:f32 = self.sample_multiplier(*sample_rate, *channel_count);
@@ -98,7 +97,6 @@ impl AudioEffect for DurationModifier {
 			for channel_index in 0..*channel_count {
 				new_data[channel_index].push(data[channel_index][source_index_left] + (data[channel_index][source_index_right] - data[channel_index][source_index_left]) * source_index_fact);
 			}
-			
 			source_index += source_index_increment;
 		}
 
