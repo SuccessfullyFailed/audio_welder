@@ -21,6 +21,15 @@ impl OutputDevice {
 
 
 
+	/* PROPERTY GETTER METHODS */
+
+	/// Get the sample rate of the device.
+	pub fn sample_rate(&self) -> u32 {
+		self.device.sample_rate
+	}
+
+
+
 	/* AUDIO PLAYING METHODS */
 
 	/// Resample buffer to match audio device sample rate and channel count.
