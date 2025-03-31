@@ -1,4 +1,4 @@
-use crate::{ AudioBufferDataLength, AudioGenerator };
+use crate::{ AudioBufferDataLength, AudioFrequency, AudioGenerator };
 
 
 
@@ -12,9 +12,9 @@ pub struct WaveGenerator {
 impl WaveGenerator {
 
 	/// Create a new wave generator with custom function.
-	pub fn new<T>(frequency:f32, sample_rate:u32, shape_function:T) -> WaveGenerator where T:Fn(&mut f32, f32, u32, usize) -> Vec<f32> + 'static {
+	pub fn new<T, R>(frequency:R, sample_rate:u32, shape_function:T) -> WaveGenerator where T:Fn(&mut f32, f32, u32, usize) -> Vec<f32> + 'static, R:AudioFrequency {
 		WaveGenerator {
-			frequency,
+			frequency: frequency.to_hz(),
 			sample_rate,
 			shape_function: Box::new(shape_function),
 			progress: 0.0
@@ -22,9 +22,9 @@ impl WaveGenerator {
 	}
 
 	/// Create a new sine-shape generator.
-	pub fn sine(frequency:f32, sample_rate:u32) -> WaveGenerator {
+	pub fn sine<R>(frequency:R, sample_rate:u32) -> WaveGenerator where R:AudioFrequency {
 		WaveGenerator::new(
-			frequency,
+			frequency.to_hz(),
 			sample_rate,
 			|progress, frequency, sample_rate, target_sample_count| {
 				let max_progress:f32 = std::f32::consts::PI;
@@ -40,9 +40,9 @@ impl WaveGenerator {
 	}
 
 	/// Create a new saw-shape generator.
-	pub fn saw(frequency:f32, sample_rate:u32) -> WaveGenerator {
+	pub fn saw<R>(frequency:R, sample_rate:u32) -> WaveGenerator where R:AudioFrequency {
 		WaveGenerator::new(
-			frequency,
+			frequency.to_hz(),
 			sample_rate,
 			|progress, frequency, sample_rate, target_sample_count| {
 				let progress_per_sample:f32 = 1.0 / (sample_rate as f32 / frequency); // 1.0 / samples per wave
@@ -57,9 +57,9 @@ impl WaveGenerator {
 	}
 
 	/// Create a new square-shape generator.
-	pub fn square(frequency:f32, sample_rate:u32) -> WaveGenerator {
+	pub fn square<R>(frequency:R, sample_rate:u32) -> WaveGenerator where R:AudioFrequency {
 		WaveGenerator::new(
-			frequency,
+			frequency.to_hz(),
 			sample_rate,
 			|progress, frequency, sample_rate, target_sample_count| {
 				let samples_per_wave:f32 = sample_rate as f32 / frequency;
