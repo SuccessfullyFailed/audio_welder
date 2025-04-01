@@ -51,11 +51,6 @@ impl AudioEffect for StereoShaper {
 	fn name(&self) -> &str {
 		"stereo_shaper"
 	}
-
-	/// Return the time multiplier of this effect.
-	fn sample_multiplier(&self, _sample_rate:u32, channel_count:usize) -> f32 {
-		1.0 / channel_count as f32 * self.target_channel_count.unwrap_or(channel_count as f32)
-	}
     
 	/// Clone the effect into a box.
 	fn boxed(&self) -> Box<dyn AudioEffect> {

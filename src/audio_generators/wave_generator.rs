@@ -27,12 +27,13 @@ impl WaveGenerator {
 			frequency.to_hz(),
 			sample_rate,
 			|progress, frequency, sample_rate, target_sample_count| {
-				let max_progress:f32 = std::f32::consts::PI;
-				let progress_per_sample:f32 = max_progress / (sample_rate as f32 / frequency); // 1.0 / samples per wave
+				const MAX_PROGRESS:f32 = std::f32::consts::PI * 2.0;
+
+				let progress_per_sample:f32 = MAX_PROGRESS / (sample_rate as f32 / frequency);
 				let mut data:Vec<f32> = Vec::with_capacity(target_sample_count);
 				for _ in 0..target_sample_count {
 					data.push(progress.sin());
-					*progress = (*progress + progress_per_sample) % max_progress;
+					*progress = (*progress + progress_per_sample) % MAX_PROGRESS;
 				}
 				data
 			}

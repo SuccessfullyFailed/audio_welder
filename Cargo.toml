@@ -9,3 +9,4 @@ crate_manager={ git="https://github.com/SuccessfullyFailed/crate_manager.git" }
 [dependencies]
 hound="3.5.0"
 cpal="0.15.2"
+image="0.23.14"

@@ -52,8 +52,7 @@ impl AudioFrequency for &str {
 
 		// Calculate frequency.
 		// f = f0 * 2 ^ (n / 12) where f0 is the reference pitch and n is the number of semitones above or below the reference pitch.
-		let semitones_above_a4:f32 = note_index as f32 + ((4.0 - octave as f32) * NOTES.len() as f32);
-		let frequency:f32 = A4_FREQUENCY * 2.0f32.powf(semitones_above_a4 / 12.0);
-		frequency
+		let semitones_above_a4:f32 = note_index as f32 + ((octave as f32 - 4.0) * NOTES.len() as f32);
+		A4_FREQUENCY * 2.0f32.powf(semitones_above_a4 / 12.0)
 	}
 }

@@ -200,10 +200,49 @@ impl AudioBuffer {
 		self.raw_data()
 	}
 
-	#[cfg(test)]
 	/// Get the amount of modifications scheduled.
+	#[cfg(test)]
 	pub(super) fn mod_count(&self) -> usize {
 		self.effects.len()
+	}
+
+	/// Create a PNG image displaying the data in this buffer.
+	#[cfg(test)]
+	pub fn write_png(&self, path:&str) -> Result<(), Box<dyn Error>> {
+		use image::{ ImageBuffer, Rgba };
+
+		const MAX_IMAGE_WIDTH:u32 = 8000;
+		const CHANNEL_HEIGHT:u32 = 200;
+		const HALF_CHANNEL_HEIGHT:u32 = CHANNEL_HEIGHT / 2;
+		const FILL_COLOR:Rgba<u8> = Rgba([0xFF, 0x00, 0x00, 0x22]);
+		const EDGE_COLOR:Rgba<u8> = Rgba([0xFF, 0x00, 0x00, 0xFF]);
+
+		// Calculate image to wave scale.
+		let bigget_channel_size:u32 = self.data.iter().map(|channel| channel.len() as u32).max().unwrap_or(0);
+		let width:u32 = bigget_channel_size.min(MAX_IMAGE_WIDTH);
+		let image_height:u32 = CHANNEL_HEIGHT * self.data.len() as u32;
+		let image_to_wave_scale:f32 = bigget_channel_size as f32 / width as f32;
+
+		// Create image.
+		let mut img:ImageBuffer<Rgba<_>, Vec<_>> = ImageBuffer::new(width as u32, image_height);
+		for channel_index in 0..self.data.len() {
+			let channel_y_offset:u32 = CHANNEL_HEIGHT * channel_index as u32;
+			let channel_data:&[f32] = &self.data[channel_index];
+			for pixel_x in 0..width as u32 {
+				let wave_x:f32 = pixel_x as f32 * image_to_wave_scale;
+				let wave_y:f32 = channel_data[(wave_x as usize).min(channel_data.len())];
+				let pixel_y:u32 = ((channel_y_offset as i32 + HALF_CHANNEL_HEIGHT as i32 + (-wave_y * HALF_CHANNEL_HEIGHT as f32) as i32) as u32).min(CHANNEL_HEIGHT - 1);
+				
+				for y in HALF_CHANNEL_HEIGHT.min(pixel_y)..HALF_CHANNEL_HEIGHT.max(pixel_y) {
+					*img.get_pixel_mut(pixel_x, y) = FILL_COLOR;
+				}
+				*img.get_pixel_mut(pixel_x, pixel_y.min(CHANNEL_HEIGHT - 1)) = EDGE_COLOR;
+			}
+		}
+		img.save(path)?;
+
+		// Return success.
+		Ok(())
 	}
 }
 impl AudioGenerator for AudioBuffer {
