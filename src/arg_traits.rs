@@ -34,18 +34,20 @@ impl AudioFrequency for usize {
 impl AudioFrequency for &str {
 	fn to_hz(&self) -> f32 {
 		const NOTES:&[&str] = &["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#"];
-		const DEFAULT_NOTE:&str = "A";
+		const DEFAULT_NOTE_INDEX:usize = 0;
+		const DEFAULT_NOTE:&str = NOTES[DEFAULT_NOTE_INDEX];
 		const DEFAULT_OCTAVE:usize = 4;
 		const A4_FREQUENCY:f32 = 440.0;
 
 
 		// Calculate note and octave.
 		let self_upper:String = self.to_uppercase();
-		let note_index:usize = match NOTES.iter().position(|note| self_upper.starts_with(note) && !self_upper.starts_with(&(note.to_string() + "#"))) {
+		let note_name:String = self_upper.chars().filter(|char| !char.is_numeric()).collect::<String>();
+		let note_index:usize = match NOTES.iter().position(|note| note == &note_name) {
 			Some(note_index) => note_index,
 			None => {
 				eprintln!("Could not find note named '{self}', using default of '{DEFAULT_NOTE}'.");
-				NOTES.iter().position(|note| *note == DEFAULT_NOTE).unwrap()
+				DEFAULT_NOTE_INDEX
 			}
 		};
 		let octave:usize = self_upper.replace(NOTES[note_index], "").trim().parse::<usize>().unwrap_or(DEFAULT_OCTAVE);
