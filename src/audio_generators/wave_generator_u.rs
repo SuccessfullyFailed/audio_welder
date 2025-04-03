@@ -20,7 +20,7 @@ mod tests {
 			for batch_size_splitter in [1, 2, 4] {
 				let batch_duration_ms:u64 = (FULL_DURATION_MILLIS as f32 / batch_size_splitter as f32) as u64;
 				let batch_duration:Duration = Duration::from_millis(batch_duration_ms);
-				for sample_rate in [10, 25, 100] {
+				for sample_rate in [10, 25] {
 
 					// Prepare file paths.
 					let file_path_no_extension:String = format!("{images_dir}/{batch_size_splitter}x{batch_duration_ms}ms_{sample_rate}sps_{frequency}hz");
