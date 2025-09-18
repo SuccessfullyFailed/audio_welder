@@ -158,6 +158,29 @@ impl AudioBuffer {
 
 
 
+	/* EFFECT SETTING METHODS */
+
+	/// Try to get the value of an effect settings.
+	pub fn get_effect_setting(&self, effect_name:&str, setting_name:&str) -> Option<f32> {
+		if let Some(effect) = self.effects.iter().find(|effect| effect.name() == effect_name) {
+			if let Some((_, setting_value)) = effect.settings().iter().find(|(name, _)| *name == setting_name) {
+				return Some(**setting_value);
+			}
+		}
+		None
+	}
+
+	/// Try to set the value of an effect settings.
+	pub fn set_effect_setting(&mut self, effect_name:&str, setting_name:&str, value:f32) {
+		if let Some(effect) = self.effects.iter_mut().find(|effect| effect.name() == effect_name) {
+			if let Some((_, setting_value)) = effect.settings_mut().iter_mut().find(|(name, _)| *name == setting_name) {
+				**setting_value = value;
+			}
+		}
+	}
+
+
+
 	/* PROPERTY GETTER METHODS */
 
 	/// Get the channel-count.
